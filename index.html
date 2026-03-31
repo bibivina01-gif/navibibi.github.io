@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>캐릭터 키 비교표 생성기 (저장 잘림 완벽 해결)</title>
+    <title>캐릭터 키 비교표 생성기 (완벽 고정 & 극강의 부드러움)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
     <style>
         /* 웹 폰트 */
@@ -42,8 +42,7 @@
         #export-area { 
             position: relative; width: 1200px; height: 780px; 
             background-color: white; border: 2px solid #333; overflow: hidden; margin: 0 auto;
-            font-family: 'Malgun Gothic', sans-serif;
-            /* 원인 1: 크기가 서서히 변하는 transition 제거 (저장 시 꼬임 방지) */
+            transition: width 0.3s ease; font-family: 'Malgun Gothic', sans-serif;
         }
         
         .team-title-display { text-align: center; font-size: 34px; font-weight: bold; padding-top: 20px; margin: 0; position: relative; z-index: 10; } 
@@ -58,8 +57,7 @@
 
         .character-wrapper {
             position: absolute; bottom: 80px; left: 100px; z-index: 5;
-            cursor: ew-resize; user-select: none;
-            display: block; 
+            cursor: ew-resize; user-select: none; display: block; 
         }
         .character-wrapper:active { cursor: grabbing; }
         
@@ -75,12 +73,14 @@
         .character-image-container { 
             position: relative; height: 100%; width: max-content;
             display: flex; justify-content: center; align-items: flex-end;
+            /* transform 등 모든 처리는 JS에서 GPU 가속으로 제어 */
         }
         
         .character-image { 
             position: relative; height: 100%; width: auto; 
-            pointer-events: none; transform-origin: bottom center; 
-            bottom: 0px; 
+            pointer-events: none; transform-origin: bottom center;
+            /* bottom: 0 속성을 삭제하여 렌더링 부하 원인 제거 */
+            will-change: transform; /* 브라우저에 하드웨어 가속을 미리 준비시킴 */
         }
         
         .character-info { 
@@ -154,11 +154,11 @@
             <div class="slider-group">
                 <label>
                     <span><b>비율 크기 조절</b> (현재: <span id="scale-val">1.00</span>배)</span>
-                    <input type="range" id="global-scale" min="0.5" max="2.0" step="0.005" value="1">
+                    <input type="range" id="global-scale" min="0.5" max="2.0" step="0.001" value="1">
                 </label>
                 <label>
                     <span><b>발끝 위치 조절</b> (현재: <span id="y-val">0</span>px)</span>
-                    <input type="range" id="global-y" min="-150" max="150" step="1" value="0">
+                    <input type="range" id="global-y" min="-150" max="150" step="0.5" value="0">
                 </label>
                 <label>
                     <span><b>✨ 오로라 (후광) 효과</b></span>
@@ -366,11 +366,13 @@
         }
     });
 
+    // 🌟 핵심 렌더링 수정: GPU(그래픽카드) 가속을 이용해 렉을 없앴습니다.
     function updateCharacterAppearance() {
         if (!selectedCharacter) return;
         
-        selectedCharacter.img.style.transform = `scale(${selectedCharacter.scale})`;
-        selectedCharacter.img.style.bottom = `${selectedCharacter.yOffset}px`;
+        // bottom 속성을 버리고, transform(translateY와 scale)로 한 번에 처리합니다.
+        // translateY를 통해 화면 재계산(Reflow) 없이 부드럽게 위아래로 움직입니다.
+        selectedCharacter.img.style.transform = `translateY(${-selectedCharacter.yOffset}px) scale(${selectedCharacter.scale})`;
         
         if (selectedCharacter.auraActive) {
             selectedCharacter.img.style.filter = `drop-shadow(0px 0px 15px ${selectedCharacter.auraColor})`;
@@ -388,7 +390,7 @@
 
     document.getElementById('global-y').addEventListener('input', function(e) {
         if (!selectedCharacter) return;
-        const val = parseInt(e.target.value);
+        const val = parseFloat(e.target.value);
         selectedCharacter.yOffset = val;
         document.getElementById('y-val').innerText = val;
         updateCharacterAppearance();
@@ -406,9 +408,8 @@
         if (selectedCharacter.auraActive) updateCharacterAppearance();
     });
 
-    // 🌟 원인 2 해결: 저장 관련 로직을 대폭 수정했습니다.
     function saveAsImage() {
-        deselectCharacter(); // 선택 효과 지우기
+        deselectCharacter(); 
         
         const target = document.getElementById('export-area');
         const scrollWrapper = document.getElementById('scroll-wrapper');
@@ -423,7 +424,6 @@
                 pixelRatio: 2,
                 width: target.offsetWidth,
                 height: target.offsetHeight,
-                // 가운데 정렬 때문에 좌표가 틀어지는 현상을 막기 위해 캡처 순간에만 여백을 강제로 없앱니다.
                 style: {
                     margin: '0',
                     transform: 'none'
@@ -443,7 +443,7 @@
                 
                 scrollWrapper.scrollLeft = originalScrollLeft;
             });
-        }, 200); // 크기 변경이 완전히 적용될 수 있도록 딜레이를 약간 더 주었습니다.
+        }, 200); 
     }
 </script>
 
