@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>캐릭터 키 비교표 생성기 (완벽 고정 버전)</title>
+    <title>캐릭터 키 비교표 생성기 (저장 잘림 완벽 해결)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
     <style>
         /* 웹 폰트 */
@@ -37,12 +37,13 @@
         .slider-group label { display: flex; flex-direction: column; font-size: 14px; }
         .slider-group input[type="range"] { margin-top: 8px; }
         
-        .right-canvas-wrapper { flex-grow: 1; overflow-x: auto; overflow-y: hidden; background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); padding: 20px; }
+        .right-canvas-wrapper { flex-grow: 1; overflow-x: auto; overflow-y: hidden; background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); padding: 20px; scroll-behavior: smooth; }
         
         #export-area { 
-            position: relative; width: 1200px; height: 780px; /* 높이 약간 조정 */
+            position: relative; width: 1200px; height: 780px; 
             background-color: white; border: 2px solid #333; overflow: hidden; margin: 0 auto;
-            transition: width 0.3s ease; font-family: 'Malgun Gothic', sans-serif;
+            font-family: 'Malgun Gothic', sans-serif;
+            /* 원인 1: 크기가 서서히 변하는 transition 제거 (저장 시 꼬임 방지) */
         }
         
         .team-title-display { text-align: center; font-size: 34px; font-weight: bold; padding-top: 20px; margin: 0; position: relative; z-index: 10; } 
@@ -53,18 +54,15 @@
         .ruler-labels { position: absolute; bottom: 0; left: 5px; height: 100%; width: 60px; z-index: 2; pointer-events: none; }
         .ruler-label { position: absolute; left: 0; font-size: 16px; color: #333; transform: translateY(50%); font-weight: bold; }
         
-        /* 텍스트 박스가 잘리지 않도록 바닥 선 높이를 80px로 올림 */
         .ground-line { position: absolute; bottom: 80px; left: 0; width: 100%; height: 3px; background-color: #333; z-index: 3; }
 
-        /* 캐릭터 전체 상자 (절대 변하지 않는 고정 영역) */
         .character-wrapper {
             position: absolute; bottom: 80px; left: 100px; z-index: 5;
             cursor: ew-resize; user-select: none;
-            display: block; /* 구조를 단단하게 고정 */
+            display: block; 
         }
         .character-wrapper:active { cursor: grabbing; }
         
-        /* 캐릭터 높이 표시선 (항상 정수리에 고정) */
         .character-height-guide { 
             position: absolute; top: 0; left: -10%; width: 120%; height: 0; 
             border-top: 2px dashed transparent; z-index: 10; 
@@ -74,20 +72,17 @@
             border-top: 2px dashed rgba(255, 0, 0, 0.8); 
         } 
         
-        /* 이미지 컨테이너 */
         .character-image-container { 
             position: relative; height: 100%; width: max-content;
             display: flex; justify-content: center; align-items: flex-end;
         }
         
-        /* 실제 조절되는 이미지 */
         .character-image { 
             position: relative; height: 100%; width: auto; 
             pointer-events: none; transform-origin: bottom center; 
-            bottom: 0px; /* 여기서 위아래 조절을 담당합니다 */
+            bottom: 0px; 
         }
         
-        /* 이름 및 키 박스 (절대 움직이거나 커지지 않음) */
         .character-info { 
             position: absolute; bottom: -70px; left: 50%; transform: translateX(-50%); 
             text-align: center; background: rgba(255,255,255,0.9); padding: 6px 12px; 
@@ -177,7 +172,7 @@
         </div>
     </div>
 
-    <div class="right-canvas-wrapper">
+    <div class="right-canvas-wrapper" id="scroll-wrapper">
         <div id="export-area">
             <h1 class="team-title-display" id="display-team-name">팀 이름을 입력해주세요</h1>
             <div id="ruler-lines-container"></div>
@@ -191,7 +186,7 @@
 
 <script>
     const PIXELS_PER_CM = 3; 
-    const GROUND_BOTTOM = 80; // 바닥 높이 80px로 변경
+    const GROUND_BOTTOM = 80; 
     const MAX_HEIGHT_CM = 220; 
     let zIndexCounter = 10; 
     let selectedCharacter = null; 
@@ -264,12 +259,14 @@
     function createCharacterElement(imgSrc, name, cm, pxHeight) {
         const wrapper = document.createElement('div');
         wrapper.className = 'character-wrapper';
-        wrapper.style.left = '150px'; 
-        // 🌟 박스의 높이를 무조건 입력한 키에 맞춰 고정시킵니다.
+        
+        const scrollWrapper = document.getElementById('scroll-wrapper');
+        const startLeft = scrollWrapper.scrollLeft + 150;
+        wrapper.style.left = startLeft + 'px'; 
+        
         wrapper.style.height = pxHeight + 'px'; 
         wrapper.style.zIndex = zIndexCounter++;
 
-        // 빨간 가이드라인 분리
         const guide = document.createElement('div');
         guide.className = 'character-height-guide';
 
@@ -280,14 +277,12 @@
         img.src = imgSrc;
         img.className = 'character-image';
 
-        // 이름표 분리
         const infoDiv = document.createElement('div');
         infoDiv.className = 'character-info';
         infoDiv.innerHTML = `<div class="character-name">${name}</div><div class="character-height-text">${cm}cm</div>`;
 
         imgContainer.appendChild(img);
         
-        // wrapper 안에 차례대로 조립
         wrapper.appendChild(guide);
         wrapper.appendChild(imgContainer);
         wrapper.appendChild(infoDiv);
@@ -371,13 +366,10 @@
         }
     });
 
-    // 🌟 오직 내부 이미지만 컨트롤합니다 (이름표, 박스 영향 X)
     function updateCharacterAppearance() {
         if (!selectedCharacter) return;
         
         selectedCharacter.img.style.transform = `scale(${selectedCharacter.scale})`;
-        
-        // 발끝 조절 (이미지 자체를 css bottom 속성으로 움직임)
         selectedCharacter.img.style.bottom = `${selectedCharacter.yOffset}px`;
         
         if (selectedCharacter.auraActive) {
@@ -414,28 +406,44 @@
         if (selectedCharacter.auraActive) updateCharacterAppearance();
     });
 
+    // 🌟 원인 2 해결: 저장 관련 로직을 대폭 수정했습니다.
     function saveAsImage() {
-        deselectCharacter();
+        deselectCharacter(); // 선택 효과 지우기
         
         const target = document.getElementById('export-area');
+        const scrollWrapper = document.getElementById('scroll-wrapper');
         const teamName = document.getElementById('team-name').value || '캐릭터';
+        
+        const originalScrollLeft = scrollWrapper.scrollLeft;
+        scrollWrapper.scrollLeft = 0; 
         
         setTimeout(() => {
             htmlToImage.toPng(target, { 
                 backgroundColor: '#ffffff',
-                pixelRatio: 2
+                pixelRatio: 2,
+                width: target.offsetWidth,
+                height: target.offsetHeight,
+                // 가운데 정렬 때문에 좌표가 틀어지는 현상을 막기 위해 캡처 순간에만 여백을 강제로 없앱니다.
+                style: {
+                    margin: '0',
+                    transform: 'none'
+                }
             })
             .then(function (dataUrl) {
                 const link = document.createElement('a');
                 link.download = `${teamName}_키비교표.png`;
                 link.href = dataUrl;
                 link.click();
+                
+                scrollWrapper.scrollLeft = originalScrollLeft;
             })
             .catch(function (error) {
                 console.error('이미지 저장 중 오류 발생!', error);
                 alert('이미지를 저장하는 중 문제가 발생했습니다.');
+                
+                scrollWrapper.scrollLeft = originalScrollLeft;
             });
-        }, 100);
+        }, 200); // 크기 변경이 완전히 적용될 수 있도록 딜레이를 약간 더 주었습니다.
     }
 </script>
 
