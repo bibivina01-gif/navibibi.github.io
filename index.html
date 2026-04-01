@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>캐릭터 키 비교표 생성기 (완벽 고정 & 극강의 부드러움)</title>
+    <title>캐릭터 키 비교표 생성기 (모바일 화면 굳힘 해결)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
     <style>
         /* 웹 폰트 */
@@ -58,7 +58,9 @@
         .character-wrapper {
             position: absolute; bottom: 80px; left: 100px; z-index: 5;
             cursor: ew-resize; user-select: none; display: block; 
-            touch-action: none; /* 모바일 터치 시 화면 스크롤 방지 및 드래그 허용 */
+            -webkit-user-drag: none; 
+            /* 🌟 FIX: none 에서 pan-y 로 변경하여 모바일 세로 스크롤이 정상 작동하도록 수정! */
+            touch-action: pan-y; 
         }
         .character-wrapper:active { cursor: grabbing; }
         
@@ -74,14 +76,12 @@
         .character-image-container { 
             position: relative; height: 100%; width: max-content;
             display: flex; justify-content: center; align-items: flex-end;
-            /* transform 등 모든 처리는 JS에서 GPU 가속으로 제어 */
         }
         
         .character-image { 
             position: relative; height: 100%; width: auto; 
             pointer-events: none; transform-origin: bottom center;
-            /* bottom: 0 속성을 삭제하여 렌더링 부하 원인 제거 */
-            will-change: transform; /* 브라우저에 하드웨어 가속을 미리 준비시킴 */
+            will-change: transform; 
         }
         
         .character-info { 
@@ -306,11 +306,23 @@
             wrapper.remove();
         });
 
+        let lastTapTime = 0;
+        wrapper.addEventListener('touchend', function(e) {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTapTime;
+            if (tapLength < 300 && tapLength > 0) { 
+                if(selectedCharacter === charData) deselectCharacter();
+                wrapper.remove();
+            } else {
+                lastTapTime = currentTime;
+            }
+        });
+
         let isDragging = false;
         let startX, initialLeft;
         let moved = false; 
 
-        // PC 마우스 드래그 로직
+        // PC 마우스
         wrapper.addEventListener('mousedown', function(e) {
             isDragging = true;
             moved = false;
@@ -327,14 +339,7 @@
             wrapper.style.left = (initialLeft + dx) + 'px';
         });
 
-        document.addEventListener('mouseup', function(e) {
-            if (isDragging && !moved) {
-                selectCharacter(charData);
-            }
-            isDragging = false;
-        });
-
-        // 모바일 터치 드래그 로직 (새로 추가)
+        // 모바일 터치
         wrapper.addEventListener('touchstart', function(e) {
             isDragging = true;
             moved = false;
@@ -350,12 +355,18 @@
             wrapper.style.left = (initialLeft + dx) + 'px';
         }, {passive: true});
 
-        document.addEventListener('touchend', function(e) {
+        // 드래그 종료 (PC, 모바일 공통)
+        const endDrag = function() {
             if (isDragging && !moved) {
                 selectCharacter(charData);
             }
             isDragging = false;
-        });
+        };
+
+        document.addEventListener('mouseup', endDrag);
+        document.addEventListener('touchend', endDrag);
+        // 🌟 FIX: 모바일 브라우저가 터치를 강제로 취소했을 때 굳는 현상 방지
+        document.addEventListener('touchcancel', endDrag);
     }
 
     function selectCharacter(charData) {
@@ -391,12 +402,15 @@
         }
     });
 
-    // 핵심 렌더링 수정: GPU(그래픽카드) 가속을 이용해 렉을 없앴습니다.
+    document.getElementById('export-area').addEventListener('touchstart', function(e) {
+        if (e.target.id === 'export-area' || e.target.id === 'ruler-lines-container' || e.target.classList.contains('ground-line')) {
+            deselectCharacter();
+        }
+    }, {passive: true});
+
     function updateCharacterAppearance() {
         if (!selectedCharacter) return;
         
-        // bottom 속성을 버리고, transform(translateY와 scale)로 한 번에 처리합니다.
-        // translateY를 통해 화면 재계산(Reflow) 없이 부드럽게 위아래로 움직입니다.
         selectedCharacter.img.style.transform = `translateY(${-selectedCharacter.yOffset}px) scale(${selectedCharacter.scale})`;
         
         if (selectedCharacter.auraActive) {
