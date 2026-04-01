@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>캐릭터 키 비교표 생성기 (완벽 고정 & 극강의 부드러움)</title>
+    <title>캐릭터 키 비교표 생성기 (모바일 터치 완벽 지원)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
     <style>
         /* 웹 폰트 */
@@ -15,9 +15,12 @@
 
         body { font-family: 'Malgun Gothic', sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; color: #333; }
         
-        .main-layout { display: flex; gap: 20px; max-width: 1800px; margin: 0 auto; align-items: flex-start; }
+        .main-layout { display: flex; flex-wrap: wrap; gap: 20px; max-width: 1800px; margin: 0 auto; align-items: flex-start; }
         
         .left-sidebar { width: 340px; flex-shrink: 0; position: sticky; top: 20px; display: flex; flex-direction: column; gap: 15px; }
+        @media (max-width: 768px) {
+            .left-sidebar { width: 100%; position: static; }
+        }
         
         .controls-container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .control-group { margin-bottom: 15px; display: flex; flex-direction: column; gap: 8px; }
@@ -37,7 +40,7 @@
         .slider-group label { display: flex; flex-direction: column; font-size: 14px; }
         .slider-group input[type="range"] { margin-top: 8px; }
         
-        .right-canvas-wrapper { flex-grow: 1; overflow-x: auto; overflow-y: hidden; background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); padding: 20px; scroll-behavior: smooth; }
+        .right-canvas-wrapper { flex-grow: 1; overflow-x: auto; overflow-y: hidden; background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); padding: 20px; scroll-behavior: smooth; width: 100%; box-sizing: border-box; }
         
         #export-area { 
             position: relative; width: 1200px; height: 780px; 
@@ -58,6 +61,8 @@
         .character-wrapper {
             position: absolute; bottom: 80px; left: 100px; z-index: 5;
             cursor: ew-resize; user-select: none; display: block; 
+            /* 🌟 모바일 터치 스와이프 시 캔버스 스크롤이 아닌 캐릭터가 드래그 되도록 설정 */
+            touch-action: pan-y; 
         }
         .character-wrapper:active { cursor: grabbing; }
         
@@ -73,14 +78,12 @@
         .character-image-container { 
             position: relative; height: 100%; width: max-content;
             display: flex; justify-content: center; align-items: flex-end;
-            /* transform 등 모든 처리는 JS에서 GPU 가속으로 제어 */
         }
         
         .character-image { 
             position: relative; height: 100%; width: auto; 
             pointer-events: none; transform-origin: bottom center;
-            /* bottom: 0 속성을 삭제하여 렌더링 부하 원인 제거 */
-            will-change: transform; /* 브라우저에 하드웨어 가속을 미리 준비시킴 */
+            will-change: transform; 
         }
         
         .character-info { 
@@ -143,8 +146,8 @@
                 <button onclick="addCharacter()">캔버스에 추가</button>
             </div>
             <div class="instruction">
-                💡 <b>이동:</b> 캐릭터를 좌우로 드래그<br>
-                💡 <b>삭제:</b> 캐릭터를 <b>빠르게 더블클릭</b><br>
+                💡 <b>이동:</b> 캐릭터를 좌우로 드래그 (모바일 터치 지원)<br>
+                💡 <b>삭제:</b> 캐릭터를 <b>빠르게 더블클릭 (모바일은 두 번 터치)</b><br>
                 💡 <b>상세조절:</b> 캐릭터를 클릭하면 아래에 패널이 열립니다.
             </div>
         </div>
@@ -299,38 +302,65 @@
             auraColor: '#a29bfe' 
         };
 
+        // PC 데스크톱용 더블클릭 삭제
         wrapper.addEventListener('dblclick', function(e) {
             e.stopPropagation();
             if(selectedCharacter === charData) deselectCharacter();
             wrapper.remove();
         });
 
+        // 🌟 모바일용 빠른 두 번 터치(더블 탭) 삭제 로직
+        let lastTapTime = 0;
+        wrapper.addEventListener('touchend', function(e) {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTapTime;
+            if (tapLength < 300 && tapLength > 0) { // 0.3초 안에 두 번 누르면 삭제
+                e.stopPropagation();
+                if(selectedCharacter === charData) deselectCharacter();
+                wrapper.remove();
+            } else {
+                lastTapTime = currentTime;
+            }
+        });
+
+        // --- 마우스 및 터치(모바일) 드래그 통합 로직 ---
         let isDragging = false;
         let startX, initialLeft;
         let moved = false; 
 
-        wrapper.addEventListener('mousedown', function(e) {
+        function dragStart(e) {
             isDragging = true;
             moved = false;
             wrapper.style.zIndex = zIndexCounter++; 
-            startX = e.clientX;
+            // 마우스 이벤트인지 터치 이벤트인지 구분하여 좌표값 가져오기
+            startX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
             initialLeft = parseInt(window.getComputedStyle(wrapper).left) || 0;
-            e.preventDefault();
-        });
+        }
 
-        document.addEventListener('mousemove', function(e) {
+        function dragMove(e) {
             if (!isDragging) return;
-            const dx = e.clientX - startX;
+            const currentX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+            const dx = currentX - startX;
             if (Math.abs(dx) > 3) moved = true; 
             wrapper.style.left = (initialLeft + dx) + 'px';
-        });
+        }
 
-        document.addEventListener('mouseup', function(e) {
+        function dragEnd(e) {
             if (isDragging && !moved) {
                 selectCharacter(charData);
             }
             isDragging = false;
-        });
+        }
+
+        // 마우스 이벤트 리스너
+        wrapper.addEventListener('mousedown', dragStart);
+        document.addEventListener('mousemove', dragMove);
+        document.addEventListener('mouseup', dragEnd);
+
+        // 터치(모바일) 이벤트 리스너 추가
+        wrapper.addEventListener('touchstart', dragStart, {passive: true});
+        document.addEventListener('touchmove', dragMove, {passive: true});
+        document.addEventListener('touchend', dragEnd);
     }
 
     function selectCharacter(charData) {
@@ -365,13 +395,17 @@
             deselectCharacter();
         }
     });
+    
+    // 모바일 배경 터치 시 선택 해제
+    document.getElementById('export-area').addEventListener('touchstart', function(e) {
+        if (e.target.id === 'export-area' || e.target.id === 'ruler-lines-container' || e.target.classList.contains('ground-line')) {
+            deselectCharacter();
+        }
+    }, {passive: true});
 
-    // 🌟 핵심 렌더링 수정: GPU(그래픽카드) 가속을 이용해 렉을 없앴습니다.
     function updateCharacterAppearance() {
         if (!selectedCharacter) return;
         
-        // bottom 속성을 버리고, transform(translateY와 scale)로 한 번에 처리합니다.
-        // translateY를 통해 화면 재계산(Reflow) 없이 부드럽게 위아래로 움직입니다.
         selectedCharacter.img.style.transform = `translateY(${-selectedCharacter.yOffset}px) scale(${selectedCharacter.scale})`;
         
         if (selectedCharacter.auraActive) {
