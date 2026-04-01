@@ -19,6 +19,13 @@
         
         .left-sidebar { width: 340px; flex-shrink: 0; position: sticky; top: 20px; display: flex; flex-direction: column; gap: 15px; }
         
+        /* 모바일 화면(768px 이하)일 때만 설정창(UI)을 위로 올리는 코드 */
+        @media (max-width: 768px) {
+            .main-layout { flex-direction: column; }
+            .left-sidebar { width: 100%; position: static; }
+            .right-canvas-wrapper { width: 100%; box-sizing: border-box; }
+        }
+        
         .controls-container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .control-group { margin-bottom: 15px; display: flex; flex-direction: column; gap: 8px; }
         .row-group { display: flex; gap: 10px; align-items: center; }
@@ -39,12 +46,11 @@
         
         .right-canvas-wrapper { flex-grow: 1; overflow-x: auto; overflow-y: hidden; background: white; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); padding: 20px; scroll-behavior: smooth; }
         
-        /* 🌟 캐릭터 선택 시 배경 스크롤을 완벽히 잠가주는 클래스 (요청하신 핵심 기능) */
-        .scroll-locked {
-            overflow-x: hidden !important;
+        /* 🌟 캐릭터 선택 시 배경 화면이 끌려오지 않도록 완전히 잠가주는 클래스 (추가됨) */
+        .lock-scroll {
             touch-action: none !important;
         }
-        
+
         #export-area { 
             position: relative; width: 1200px; height: 780px; 
             background-color: white; border: 2px solid #333; overflow: hidden; margin: 0 auto;
@@ -324,6 +330,7 @@
         let startX, initialLeft;
         let moved = false; 
 
+        // PC 마우스
         wrapper.addEventListener('mousedown', function(e) {
             isDragging = true;
             moved = false;
@@ -345,6 +352,7 @@
             isDragging = false;
         });
 
+        // 모바일 터치
         wrapper.addEventListener('touchstart', function(e) {
             isDragging = true;
             moved = false;
@@ -353,18 +361,12 @@
             initialLeft = parseInt(window.getComputedStyle(wrapper).left) || 0;
         }, {passive: true});
 
-        // 🌟 수정 포인트: 캐릭터를 드래그하는 동안 화면이 따라 움직이는 현상(스크롤) 차단
         document.addEventListener('touchmove', function(e) {
             if (!isDragging) return;
             const dx = e.touches[0].clientX - startX;
             if (Math.abs(dx) > 3) moved = true; 
             wrapper.style.left = (initialLeft + dx) + 'px';
-            
-            // 드래그 중일 때는 화면 새로고침(당겨짐)이나 스크롤 튕김 방지
-            if (e.cancelable) {
-                e.preventDefault();
-            }
-        }, {passive: false}); // preventDefault를 쓰기 위해 false로 설정
+        }, {passive: true});
 
         document.addEventListener('touchend', function(e) {
             if (isDragging && !moved) selectCharacter(charData);
@@ -389,9 +391,9 @@
 
         document.getElementById('aura-toggle').checked = charData.auraActive;
         document.getElementById('aura-color').value = charData.auraColor;
-        
-        // 🌟 수정 포인트: 캐릭터 선택 시 뒷배경 잠금
-        document.getElementById('scroll-wrapper').classList.add('scroll-locked');
+
+        // 🌟 수정 포인트: 캐릭터 선택 시 배경(캔버스) 잠금 (스크롤 안 됨)
+        document.getElementById('scroll-wrapper').classList.add('lock-scroll');
     }
 
     function deselectCharacter() {
@@ -399,9 +401,9 @@
             selectedCharacter.wrapper.classList.remove('selected');
             selectedCharacter = null;
             document.getElementById('fine-tune-panel').style.display = 'none';
-            
-            // 🌟 수정 포인트: 바깥을 눌러서 선택 해제 시 뒷배경 잠금 해제 (스크롤 허용)
-            document.getElementById('scroll-wrapper').classList.remove('scroll-locked');
+
+            // 🌟 수정 포인트: 바깥 클릭해서 선택 해제 시 배경 잠금 풀림 (스크롤 가능)
+            document.getElementById('scroll-wrapper').classList.remove('lock-scroll');
         }
     }
 
