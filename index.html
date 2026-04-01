@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>캐릭터 키 비교표 생성기 (기본 드래그 복구)</title>
+    <title>캐릭터 키 비교표 생성기 (모바일 UI 상단 배치)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
     <style>
         /* 웹 폰트 */
@@ -18,6 +18,13 @@
         .main-layout { display: flex; gap: 20px; max-width: 1800px; margin: 0 auto; align-items: flex-start; }
         
         .left-sidebar { width: 340px; flex-shrink: 0; position: sticky; top: 20px; display: flex; flex-direction: column; gap: 15px; }
+        
+        /* 🌟 모바일 화면(768px 이하)일 때만 설정창(UI)을 위로 올리는 코드 추가! (다른 건 절대 안 건드렸습니다) */
+        @media (max-width: 768px) {
+            .main-layout { flex-direction: column; }
+            .left-sidebar { width: 100%; position: static; }
+            .right-canvas-wrapper { width: 100%; box-sizing: border-box; }
+        }
         
         .controls-container { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .control-group { margin-bottom: 15px; display: flex; flex-direction: column; gap: 8px; }
@@ -58,7 +65,6 @@
         .character-wrapper {
             position: absolute; bottom: 80px; left: 100px; z-index: 5;
             cursor: ew-resize; user-select: none; display: block; 
-            /* 화면을 굳게 만들었던 touch-action 관련 코드를 완전히 삭제했습니다! */
         }
         
         .character-height-guide { 
@@ -315,7 +321,6 @@
             }
         });
 
-        // 🌟 가장 순수하고 직관적인 드래그 방식만 남겼습니다.
         let isDragging = false;
         let startX, initialLeft;
         let moved = false; 
