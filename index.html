@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>캐릭터 키 비교표 생성기 (모바일 화면 굳힘 해결)</title>
+    <title>캐릭터 키 비교표 생성기 (기본 드래그 복구)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
     <style>
         /* 웹 폰트 */
@@ -58,11 +58,8 @@
         .character-wrapper {
             position: absolute; bottom: 80px; left: 100px; z-index: 5;
             cursor: ew-resize; user-select: none; display: block; 
-            -webkit-user-drag: none; 
-            /* 🌟 FIX: none 에서 pan-y 로 변경하여 모바일 세로 스크롤이 정상 작동하도록 수정! */
-            touch-action: pan-y; 
+            /* 화면을 굳게 만들었던 touch-action 관련 코드를 완전히 삭제했습니다! */
         }
-        .character-wrapper:active { cursor: grabbing; }
         
         .character-height-guide { 
             position: absolute; top: 0; left: -10%; width: 120%; height: 0; 
@@ -145,7 +142,7 @@
             </div>
             <div class="instruction">
                 💡 <b>이동:</b> 캐릭터를 좌우로 드래그<br>
-                💡 <b>삭제:</b> 캐릭터를 <b>빠르게 더블클릭</b><br>
+                💡 <b>삭제:</b> 캐릭터를 <b>빠르게 더블클릭 (모바일 톡톡 터치)</b><br>
                 💡 <b>상세조절:</b> 캐릭터를 클릭하면 아래에 패널이 열립니다.
             </div>
         </div>
@@ -318,6 +315,7 @@
             }
         });
 
+        // 🌟 가장 순수하고 직관적인 드래그 방식만 남겼습니다.
         let isDragging = false;
         let startX, initialLeft;
         let moved = false; 
@@ -329,14 +327,19 @@
             wrapper.style.zIndex = zIndexCounter++; 
             startX = e.clientX;
             initialLeft = parseInt(window.getComputedStyle(wrapper).left) || 0;
-            e.preventDefault();
+            e.preventDefault(); 
         });
 
         document.addEventListener('mousemove', function(e) {
-            if (!isDragging || e.type !== 'mousemove') return;
+            if (!isDragging) return;
             const dx = e.clientX - startX;
             if (Math.abs(dx) > 3) moved = true; 
             wrapper.style.left = (initialLeft + dx) + 'px';
+        });
+
+        document.addEventListener('mouseup', function(e) {
+            if (isDragging && !moved) selectCharacter(charData);
+            isDragging = false;
         });
 
         // 모바일 터치
@@ -349,24 +352,16 @@
         }, {passive: true});
 
         document.addEventListener('touchmove', function(e) {
-            if (!isDragging || e.type !== 'touchmove') return;
+            if (!isDragging) return;
             const dx = e.touches[0].clientX - startX;
             if (Math.abs(dx) > 3) moved = true; 
             wrapper.style.left = (initialLeft + dx) + 'px';
         }, {passive: true});
 
-        // 드래그 종료 (PC, 모바일 공통)
-        const endDrag = function() {
-            if (isDragging && !moved) {
-                selectCharacter(charData);
-            }
+        document.addEventListener('touchend', function(e) {
+            if (isDragging && !moved) selectCharacter(charData);
             isDragging = false;
-        };
-
-        document.addEventListener('mouseup', endDrag);
-        document.addEventListener('touchend', endDrag);
-        // 🌟 FIX: 모바일 브라우저가 터치를 강제로 취소했을 때 굳는 현상 방지
-        document.addEventListener('touchcancel', endDrag);
+        });
     }
 
     function selectCharacter(charData) {
